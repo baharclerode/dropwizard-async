@@ -32,6 +32,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Slf4j
 public class AsyncBundleTest {
 
+    /**
+     * How many concurrent connections to test; Should be more than 2048 since that's the maximum number of connections Dropwizard's default
+     * configuration can accept before it must start rejecting connections.
+     */
+    public static final int MAX_CONCURRENT = 5000;
+
     @Path("test")
     @Slf4j
     public static class TestResource {
@@ -46,7 +52,7 @@ public class AsyncBundleTest {
         @GET
         public CompletionStage<Response> getCompletionStage() {
             int activeRequests = this.activeRequests.incrementAndGet();
-            if (activeRequests == 5000) {
+            if (activeRequests == MAX_CONCURRENT) {
                 responseTrigger.complete(null);
             }
             return responseTrigger.thenApply(ignored -> Response.status(234).build());
@@ -56,7 +62,7 @@ public class AsyncBundleTest {
         @GET
         public ListenableFuture<Response> getListenableFuture() {
             int activeRequests = this.activeRequests.incrementAndGet();
-            if (activeRequests == 5000) {
+            if (activeRequests == MAX_CONCURRENT) {
                 responseTrigger.complete(null);
             }
             SettableFuture<Response> promise = SettableFuture.create();
@@ -68,7 +74,7 @@ public class AsyncBundleTest {
         @GET
         public jersey.repackaged.com.google.common.util.concurrent.ListenableFuture<Response> getRepackagedListenableFuture() {
             int activeRequests = this.activeRequests.incrementAndGet();
-            if (activeRequests == 5000) {
+            if (activeRequests == MAX_CONCURRENT) {
                 responseTrigger.complete(null);
             }
             jersey.repackaged.com.google.common.util.concurrent.SettableFuture<Response> promise = jersey.repackaged.com.google.common.util.concurrent.SettableFuture
@@ -106,8 +112,8 @@ public class AsyncBundleTest {
 
     private void testEndpoint(String endpoint) throws InterruptedException, ExecutionException, TimeoutException {
         long startTime = System.currentTimeMillis();
-        final CompletableFuture[] promises = new CompletableFuture[5000];
-        for (int i = 0; i < 5000; i++) {
+        final CompletableFuture[] promises = new CompletableFuture[MAX_CONCURRENT];
+        for (int i = 0; i < MAX_CONCURRENT; i++) {
             CompletableFuture<Result> promise = new CompletableFuture<>();
             client.newRequest(dropwizard.baseUri() + "/test/" + endpoint).send(result -> {
                 if (result.getFailure() != null) {
