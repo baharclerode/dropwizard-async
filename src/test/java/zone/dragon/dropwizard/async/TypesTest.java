@@ -170,9 +170,9 @@ public class TypesTest {
 
 
         @Test
-        void withInheritedType() {
+        void withNonGenericType() {
             Type result = Types.resolveReifiedType(BoundTypeFixture.class, BoundTypeFixture.INHERITED_TYPE, GenericTypeFixture.class, 0);
-            assertThat(result).isEqualTo(Long.class);
+            assertThat(result).isEqualTo(null);
         }
 
         @Test
