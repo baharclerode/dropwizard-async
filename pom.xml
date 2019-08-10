@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -12,7 +10,7 @@
 
     <groupId>zone.dragon.dropwizard</groupId>
     <artifactId>dropwizard-async</artifactId>
-    <version>1.2-SNAPSHOT</version>
+    <version>1.2.9-2552d7</version>
 
     <name>Dropwizard :: Async Support</name>
     <description>
@@ -24,7 +22,7 @@
         <connection>scm:git:http://github.com/dragonzone/dropwizard-async.git</connection>
         <developerConnection>scm:git:ssh://git@github.com:dragonzone/dropwizard-async.git</developerConnection>
         <url>https://github.com/dragonzone/dropwizard-async/tree/master</url>
-        <tag>HEAD</tag>
+        <tag>dropwizard-async-1.2.9</tag>
     </scm>
 
     <licenses>
