@@ -1,6 +1,5 @@
 package zone.dragon.dropwizard.async;
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -45,7 +44,7 @@ public class AsyncBundleTest {
      * How many concurrent connections to test; Should be more than 2048 since that's the maximum number of connections Dropwizard's default
      * configuration can accept before it must start rejecting connections.
      */
-    public static final int MAX_CONCURRENT = 10;
+    public static final int MAX_CONCURRENT = 20;
 
     /**
      * Custom configuration that sets the maximum number of available request handling threads to 4
@@ -56,12 +55,9 @@ public class AsyncBundleTest {
             SimpleServerFactory serverFactory = new SimpleServerFactory();
             HttpConnectorFactory connectorFactory = new HttpConnectorFactory();
             connectorFactory.setPort(0);
-            connectorFactory.setAcceptorThreads(Optional.of(1));
-            connectorFactory.setAcceptQueueSize(MAX_CONCURRENT);
             serverFactory.setConnector(connectorFactory);
             serverFactory.setApplicationContextPath("/");
-            serverFactory.setMinThreads(0);
-            serverFactory.setMaxThreads(5);
+            serverFactory.setMaxThreads(MAX_CONCURRENT / 2); // not enough to handle all requests concurrently
             serverFactory.setMaxQueuedRequests(MAX_CONCURRENT);
             setServerFactory(serverFactory);
         }
