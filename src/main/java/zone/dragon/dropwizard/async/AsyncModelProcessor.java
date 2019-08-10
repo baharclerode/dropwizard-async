@@ -17,14 +17,7 @@
 
 package zone.dragon.dropwizard.async;
 
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +27,6 @@ import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Configuration;
 
-import org.glassfish.hk2.utilities.reflection.ReflectionHelper;
 import org.glassfish.jersey.server.model.Invocable;
 import org.glassfish.jersey.server.model.ModelProcessor;
 import org.glassfish.jersey.server.model.Resource;
@@ -46,14 +38,15 @@ import com.google.common.util.concurrent.ListenableFuture;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Model Processor to alter resource methods to run {@link Suspended} if they return a {@link ListenableFuture}, {@link CompletionStage},
- * or {@link CompletableFuture}
+ * Model Processor to alter resource methods to run {@link Suspended} if they return a {@link ListenableFuture}, {@link CompletionStage}, or
+ * {@link CompletableFuture}
  *
  * @author Bryan Harclerode
  */
 @Slf4j
 @Singleton
 public class AsyncModelProcessor implements ModelProcessor {
+
     private ResourceModel processModel(ResourceModel originalModel, boolean subresource) {
         ResourceModel.Builder modelBuilder = new ResourceModel.Builder(subresource);
         for (Resource originalResource : originalModel.getResources()) {
@@ -72,21 +65,27 @@ public class AsyncModelProcessor implements ModelProcessor {
         return processModel(subResourceModel, true);
     }
 
-    protected boolean isAsyncType(Type type) {
-        Class<?> rawType = ReflectionHelper.getRawClass(type);
-        return CompletionStage.class.isAssignableFrom(rawType)
-            || ListenableFuture.class.isAssignableFrom(rawType)
-            || jersey.repackaged.com.google.common.util.concurrent.ListenableFuture.class.isAssignableFrom(rawType);
-    }
-
     protected Type isAsyncMethod(ResourceMethod method) {
         Invocable invocable = method.getInvocable();
-        if (CompletionStage.class.isAssignableFrom(invocable.getRawResponseType())) {
-            return resolveType(invocable.getResponseType(), CompletionStage.class, 0);
-        } else if (ListenableFuture.class.isAssignableFrom(invocable.getRawResponseType())) {
-            return resolveType(invocable.getResponseType(), ListenableFuture.class, 0);
-        } else if (jersey.repackaged.com.google.common.util.concurrent.ListenableFuture.class.isAssignableFrom(invocable.getRawResponseType())) {
-            return resolveType(invocable.getResponseType(), jersey.repackaged.com.google.common.util.concurrent.ListenableFuture.class, 0);
+        if (invocable == null || invocable.getResponseType() == null) {
+            return null;
+        }
+        Type responseType = invocable.getResponseType();
+        Class<?> handlerClass = null;
+        if (invocable.getHandler() != null) {
+            handlerClass = invocable.getHandler().getHandlerClass();
+        }
+        if (Types.isSubtypeOf(responseType, CompletionStage.class)) {
+            return Types.resolveReifiedType(handlerClass, responseType, CompletionStage.class, 0);
+        } else if (Types.isSubtypeOf(responseType, ListenableFuture.class)) {
+            return Types.resolveReifiedType(handlerClass, responseType, ListenableFuture.class, 0);
+        } else if (Types.isSubtypeOf(responseType, jersey.repackaged.com.google.common.util.concurrent.ListenableFuture.class)) {
+            return Types.resolveReifiedType(
+                handlerClass,
+                responseType,
+                jersey.repackaged.com.google.common.util.concurrent.ListenableFuture.class,
+                0
+            );
         } else {
             return null;
         }
@@ -101,7 +100,11 @@ public class AsyncModelProcessor implements ModelProcessor {
         for (ResourceMethod originalMethod : original.getResourceMethods()) {
             Type asyncResponseType = isAsyncMethod(originalMethod);
             if (asyncResponseType != null) {
-                log.info("Marking resource method as suspended: {} returns {}", originalMethod.getInvocable().getRawRoutingResponseType(), asyncResponseType);
+                log.info(
+                    "Marking resource method as suspended: {} returns {}",
+                    originalMethod.getInvocable().getRawRoutingResponseType(),
+                    asyncResponseType
+                );
                 resourceBuilder
                     .updateMethod(originalMethod)
                     .suspended(AsyncResponse.NO_TIMEOUT, TimeUnit.MILLISECONDS)
@@ -111,30 +114,4 @@ public class AsyncModelProcessor implements ModelProcessor {
         return resourceBuilder.build();
     }
 
-    protected final Type resolveType(Type boundType, Class targetClass, int targetClassIndex) {
-        return resolveType(boundType, targetClass.getTypeParameters()[targetClassIndex]);
-    }
-
-    protected final Type resolveType(Type boundType, TypeVariable targetType) {
-        List<Type> typeQueue = new ArrayList<>(1);
-        typeQueue.add(boundType);
-        Map<TypeVariable, Type> knownTypes = new HashMap<>();
-        while (!knownTypes.containsKey(targetType)) {
-            if (typeQueue.isEmpty()) {
-                return null;
-            }
-            Type next = typeQueue.remove(0);
-            if (next instanceof ParameterizedType) {
-                Class<?> rawClass = org.glassfish.jersey.internal.util.ReflectionHelper.erasure(next);
-                TypeVariable<?>[] boundVariables = rawClass.getTypeParameters();
-                for (int i = 0; i < boundVariables.length; i++) {
-                    knownTypes.putIfAbsent(boundVariables[i], ((ParameterizedType) next).getActualTypeArguments()[i]);
-                }
-            } else if (next instanceof Class) {
-                typeQueue.addAll(Arrays.asList(((Class) next).getGenericInterfaces()));
-                typeQueue.add(((Class) next).getGenericSuperclass());
-            }
-        }
-        return knownTypes.get(targetType);
-    }
 }

@@ -1,5 +1,6 @@
 package zone.dragon.dropwizard.async;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -24,8 +25,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
-import io.dropwizard.testing.junit5.DropwizardClientExtension;
+import io.dropwizard.Application;
+import io.dropwizard.Configuration;
+import io.dropwizard.jetty.HttpConnectorFactory;
+import io.dropwizard.server.SimpleServerFactory;
+import io.dropwizard.setup.Environment;
+import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +45,44 @@ public class AsyncBundleTest {
      * How many concurrent connections to test; Should be more than 2048 since that's the maximum number of connections Dropwizard's default
      * configuration can accept before it must start rejecting connections.
      */
-    public static final int MAX_CONCURRENT = 3000;
+    public static final int MAX_CONCURRENT = 10;
+
+    /**
+     * Custom configuration that sets the maximum number of available request handling threads to 4
+     */
+    @Data
+    public static class SimpleConfig extends Configuration {
+        public SimpleConfig() {
+            SimpleServerFactory serverFactory = new SimpleServerFactory();
+            HttpConnectorFactory connectorFactory = new HttpConnectorFactory();
+            connectorFactory.setPort(0);
+            connectorFactory.setAcceptorThreads(Optional.of(1));
+            connectorFactory.setAcceptQueueSize(MAX_CONCURRENT);
+            serverFactory.setConnector(connectorFactory);
+            serverFactory.setApplicationContextPath("/");
+            serverFactory.setMinThreads(0);
+            serverFactory.setMaxThreads(5);
+            serverFactory.setMaxQueuedRequests(MAX_CONCURRENT);
+            setServerFactory(serverFactory);
+        }
+    }
+
+    public static class SimpleApplication extends Application<SimpleConfig> {
+
+        @Override
+        public void run(SimpleConfig configuration, Environment environment) {
+            environment.jersey().register(AsyncFeature.class);
+            environment.jersey().register(TestResource.class);
+            environment.jersey().register(new AbstractBinder() {
+                @Override
+                protected void configure() {
+                    bind(new CompletableFuture<Void>()).to(new TypeLiteral<CompletableFuture<Void>>() {});
+                    bind(new AtomicInteger()).to(AtomicInteger.class);
+                }
+            });
+        }
+    }
+
 
     @Path("test")
     @Slf4j
@@ -54,12 +98,10 @@ public class AsyncBundleTest {
         @GET
         public CompletionStage<Response> getCompletionStage() {
             int activeRequests = this.activeRequests.incrementAndGet();
-            if (activeRequests % 100 == 0) {
-                log.info("Reached {} active requests", activeRequests);
-            }
             if (activeRequests == MAX_CONCURRENT) {
                 responseTrigger.complete(null);
             }
+            log.info("thread={}", Thread.currentThread().getName());
             return responseTrigger.thenApply(ignored -> Response.status(234).build());
         }
 
@@ -89,23 +131,17 @@ public class AsyncBundleTest {
         }
     }
 
-    public final DropwizardClientExtension dropwizard = new DropwizardClientExtension(
-        AsyncFeature.class,
-        TestResource.class,
-        new AbstractBinder() {
-            @Override
-            protected void configure() {
-                bind(new CompletableFuture<Void>()).to(new TypeLiteral<CompletableFuture<Void>>() {});
-                bind(new AtomicInteger()).to(AtomicInteger.class);
-            }
-        }
+    public final DropwizardAppExtension<SimpleConfig> dropwizard = new DropwizardAppExtension<>(
+        SimpleApplication.class,
+        new SimpleConfig()
     );
+
     private HttpClient client;
 
     @BeforeEach
     public void setup() throws Exception {
         client = new HttpClient();
-        client.setMaxConnectionsPerDestination(10000);
+        client.setMaxConnectionsPerDestination(100);
         client.start();
 
 
@@ -121,7 +157,7 @@ public class AsyncBundleTest {
         final CompletableFuture[] promises = new CompletableFuture[MAX_CONCURRENT];
         for (int i = 0; i < MAX_CONCURRENT; i++) {
             CompletableFuture<Result> promise = new CompletableFuture<>();
-            client.newRequest(dropwizard.baseUri() + "/test/" + endpoint).send(result -> {
+            client.newRequest("http://localhost:" + dropwizard.getLocalPort() + "/test/" + endpoint).send(result -> {
                 if (result.getFailure() != null) {
                     promise.completeExceptionally(result.getFailure());
                 } else {

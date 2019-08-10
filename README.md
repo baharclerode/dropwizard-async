@@ -9,3 +9,6 @@ To use this bundle, add it to your application in the initialize method:
     public void initialize(Bootstrap<T> bootstrap) {
         bootstrap.addBundle(new AsyncBundle());
     }
+
+After that, simply return a `CompletableFuture` from your resource methods and they will no longer tie up jetty request threads while the
+request continues to process. 

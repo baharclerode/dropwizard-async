@@ -65,7 +65,7 @@ public class AsyncJavaResourceMethodDispatcherProvider implements ResourceMethod
             || jersey.repackaged.com.google.common.util.concurrent.ListenableFuture.class.isAssignableFrom(returnType)) {
             val dispatcher = new AsyncInvoker(resourceMethod, invocationHandler, valueProviders, responseValidator, responseProvider);
 
-            // Inject responseValidator.
+            // Inject dispatcher
             serviceLocator.inject(dispatcher);
             return dispatcher;
         } else {
