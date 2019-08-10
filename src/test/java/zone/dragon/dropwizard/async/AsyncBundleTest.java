@@ -58,7 +58,7 @@ public class AsyncBundleTest {
             serverFactory.setConnector(connectorFactory);
             serverFactory.setApplicationContextPath("/");
             serverFactory.setMaxThreads(MAX_CONCURRENT / 2); // not enough to handle all requests concurrently
-            serverFactory.setMaxQueuedRequests(MAX_CONCURRENT);
+            serverFactory.setMaxQueuedRequests(MAX_CONCURRENT * 2);
             setServerFactory(serverFactory);
         }
     }

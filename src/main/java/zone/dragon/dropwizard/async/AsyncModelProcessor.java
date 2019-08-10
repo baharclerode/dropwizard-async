@@ -100,7 +100,7 @@ public class AsyncModelProcessor implements ModelProcessor {
         for (ResourceMethod originalMethod : original.getResourceMethods()) {
             Type asyncResponseType = isAsyncMethod(originalMethod);
             if (asyncResponseType != null) {
-                log.info(
+                log.debug(
                     "Marking resource method as suspended: {} returns {}",
                     originalMethod.getInvocable().getRawRoutingResponseType(),
                     asyncResponseType
